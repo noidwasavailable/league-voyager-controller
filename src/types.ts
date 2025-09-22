@@ -136,3 +136,35 @@ export function isEasyName(value: unknown): value is EasyName {
     return false;
   }
 }
+
+export interface LCUCredentials {
+  pid: number;
+  port: number;
+  password: string;
+  protocol: string;
+}
+
+export interface FetchLCUOptions extends RequestInit {
+  /**
+   * If true (default), sets Authorization header with Basic riot:<password>
+   */
+  auth?: boolean;
+  /**
+   * If true (default), sets tls.rejectUnauthorized = false (Bun specific)
+   * for local self-signed certificate.
+   */
+  insecureTLS?: boolean;
+}
+
+export interface GetCredentialsOptions {
+  /**
+   * Maximum time to wait (ms) while polling for credentials.
+   *  - 0 or undefined means single attempt (no polling).
+   *  - >0 => poll until timeout or success.
+   */
+  timeoutMs?: number;
+  /**
+   * Poll interval (ms) when timeoutMs > 0 (default: 500)
+   */
+  pollIntervalMs?: number;
+}
