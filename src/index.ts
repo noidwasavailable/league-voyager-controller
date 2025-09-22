@@ -1,5 +1,5 @@
 import { $, sleep, sleepSync } from "bun";
-import { setRgb } from "./setRgb";
+import kontroll from "./kontroll";
 
 /**
  * kontroll --help
@@ -34,6 +34,6 @@ const res = await $`kontroll restore-rgb-leds`.text();
 
 console.log(res);
 
-const res2 = await setRgb({ led: "left-3-0", color: "#ff0000" });
-await setRgb({ led: "left-2-2", color: "#00ff00" });
+const res2 = await kontroll.setRgb({ led: "left-3-0", color: "#ff0000" });
+await kontroll.setRgb({ led: "left-2-2", color: "#00ff00" });
 console.log(res2);

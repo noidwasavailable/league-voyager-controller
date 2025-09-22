@@ -11,8 +11,8 @@ Options:
   -h, --help               Print help
 */
 import { $ } from "bun";
-import { validateSetRgbOptions, parseEasyName, isEasyName } from "./types";
-import type { EasyName, SetRgbOptions } from "./types";
+import { validateSetRgbOptions, parseEasyName, isEasyName } from "@types";
+import type { EasyName, SetRgbOptions } from "@types";
 
 export const setRgb = async (input: SetRgbOptions) => {
   // Runtime validation; will throw if invalid
