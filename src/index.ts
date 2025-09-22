@@ -110,7 +110,6 @@ const main = async () => {
     );
     spell1Id = res.spell1Id;
     spell2Id = res.spell2Id;
-    console.log(`spell1Id: ${spell1Id}, spell2Id: ${spell2Id}`);
   });
   // ---------------------------------------------------------------------------
 };
