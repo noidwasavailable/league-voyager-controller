@@ -79,7 +79,10 @@ export const LedIndexSchema = z.number().int().min(0).max(51);
 export const SetRgbOptionsSchema = z.object({
   led: z.union([LedIndexSchema, EasyNameSchema]),
   color: HexColorSchema,
+  sustain: z.number().int().min(0).default(0).optional(),
 });
+
+export const SetRgbAllOptionsSchema = SetRgbOptionsSchema.omit({ led: true });
 
 export type EasyNameBoard = z.infer<typeof EasyNameBoardSchema>;
 export type EasyNameX = z.infer<typeof EasyNameXSchema>;
@@ -87,6 +90,7 @@ export type EasyNameY = z.infer<typeof EasyNameYSchema>;
 export type EasyName = `${EasyNameBoard}-${EasyNameX}-${EasyNameY}`; // template literal for ergonomics
 export type ParsedEasyName = z.infer<typeof ParsedEasyNameSchema>;
 export type SetRgbOptions = z.infer<typeof SetRgbOptionsSchema>;
+export type SetRgbAllOptions = z.infer<typeof SetRgbAllOptionsSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*  Helper functions                                                          */

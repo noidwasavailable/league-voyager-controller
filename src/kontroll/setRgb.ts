@@ -12,19 +12,24 @@ Options:
 */
 import { $ } from "bun";
 import { validateSetRgbOptions, parseEasyName, isEasyName } from "@types";
-import type { EasyName, SetRgbOptions } from "@types";
+import type { EasyName, SetRgbAllOptions, SetRgbOptions } from "@types";
 
 export const setRgb = async (input: SetRgbOptions) => {
   // Runtime validation; will throw if invalid
-  const { led, color } = validateSetRgbOptions(input);
+  const { led, color, sustain } = validateSetRgbOptions(input);
   if (typeof led === "number") {
-    return await $`kontroll set-rgb --led ${led} --color ${color}`.text();
+    return await $`kontroll set-rgb --led ${led} --color ${color} --sustain ${sustain}`.text();
   }
   if (isEasyName(led)) {
     const index = translateNameToNum(led as EasyName);
-    return await $`kontroll set-rgb --led ${index} --color ${color}`.text();
+    return await $`kontroll set-rgb --led ${index} --color ${color} --sustain ${sustain}`.text();
   }
   throw new Error("Invalid LED identifier");
+};
+
+export const setRgbAll = async (input: SetRgbAllOptions) => {
+  const { color, sustain } = input;
+  return await $`kontroll set-rgb-all --color ${color} --sustain ${sustain}`.text();
 };
 
 /**

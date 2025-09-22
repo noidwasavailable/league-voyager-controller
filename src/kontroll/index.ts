@@ -1,7 +1,8 @@
 import { restoreRgbLeds } from "./restoreRgbLeds";
-import { setRgb } from "./setRgb";
+import { setRgb, setRgbAll } from "./setRgb";
 
 export default {
   setRgb,
+  setRgbAll,
   restoreRgbLeds,
 };

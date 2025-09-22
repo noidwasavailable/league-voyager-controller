@@ -30,10 +30,12 @@ import kontroll from "./kontroll";
  */
 
 // Use Response as stdin.
-const res = await $`kontroll restore-rgb-leds`.text();
+await kontroll.restoreRgbLeds();
 
-console.log(res);
-
-const res2 = await kontroll.setRgb({ led: "left-3-0", color: "#ff0000" });
+const res2 = await kontroll.setRgb({
+  led: "left-3-0",
+  color: "#ff0000",
+});
+// await kontroll.restoreRgbLeds();
 await kontroll.setRgb({ led: "left-2-2", color: "#00ff00" });
 console.log(res2);
