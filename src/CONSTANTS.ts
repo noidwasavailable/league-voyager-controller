@@ -17,7 +17,7 @@ export const SpellEnums = [
   {
     name: "Flash",
     spellId: 4,
-    color: "#FF00FF",
+    color: "#FFFF00",
   },
   {
     name: "Ghost",
