@@ -1,7 +1,14 @@
 import {
+  COLOR_BASIC_ABILITIES,
+  COLOR_ULT,
   LEAGUE_LAYER,
-  SPELL_1_SLOT,
-  SPELL_2_SLOT,
+  RETURN_TO_BASE_LAYER,
+  SLOT_E,
+  SLOT_Q,
+  SLOT_R,
+  SLOT_SPELL_1,
+  SLOT_SPELL_2,
+  SLOT_W,
   SpellEnums,
 } from "./CONSTANTS";
 import kontroll from "./kontroll";
@@ -19,32 +26,29 @@ const initLeagueMode = async ({
 }) => {
   kontroll.setLayer(LEAGUE_LAYER);
   // --- Set up Defaults -------------------------------------------------------
-  const qwe = ["left-1-1", "left-2-1", "left-3-1"];
-  const r = "left-4-1";
-  const RETURN_TO_BASE_LAYER = "right-5-3";
 
-  qwe.forEach((led) =>
+  [SLOT_Q, SLOT_W, SLOT_E].forEach((led) =>
     kontroll.setRgb({
       led: led,
-      color: "#15BBF2", //cyan-blue-ish
+      color: COLOR_BASIC_ABILITIES,
     }),
   );
 
-  [r, RETURN_TO_BASE_LAYER].forEach((led) => {
+  [SLOT_R, RETURN_TO_BASE_LAYER].forEach((led) => {
     kontroll.setRgb({
       led: led,
-      color: "#F50A4E", //magenta-red-ish
+      color: COLOR_ULT,
     });
   });
   // ---------------------------------------------------------------------------
   // Set up spells
   kontroll.setRgb({
-    led: SPELL_1_SLOT,
+    led: SLOT_SPELL_1,
     color: resolveSpellColor(spell1Id),
   });
 
   kontroll.setRgb({
-    led: SPELL_2_SLOT,
+    led: SLOT_SPELL_2,
     color: resolveSpellColor(spell2Id),
   });
 };
@@ -111,34 +115,3 @@ const main = async () => {
   // ---------------------------------------------------------------------------
 };
 await main();
-// const insecureAgent = new https.Agent({
-//   rejectUnauthorized: false,
-// });
-
-// const getActivePlayer = async () => {
-//   const response = await fetch(
-//     `https://127.0.0.1:2999/liveclientdata/activeplayer`,
-//     {
-//       tls: {
-//         rejectUnauthorized: false,
-//       },
-//     },
-//   );
-//   console.log(response);
-//   const data = await response.json();
-
-//   return data;
-// };
-
-// console.log(await getActivePlayer());
-
-// // Use Response as stdin.
-// await kontroll.restoreRgbLeds();
-
-// const res2 = await kontroll.setRgb({
-//   led: "left-3-0",
-//   color: "#ff0000",
-// });
-// // await kontroll.restoreRgbLeds();
-// await kontroll.setRgb({ led: "left-2-2", color: "#00ff00" });
-// console.log(res2);

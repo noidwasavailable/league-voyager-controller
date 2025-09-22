@@ -1,7 +1,16 @@
 export const LEAGUE_LAYER = 3;
 
-export const SPELL_1_SLOT = "left-3-2";
-export const SPELL_2_SLOT = "left-4-2";
+export const SLOT_SPELL_1 = "left-3-2";
+export const SLOT_SPELL_2 = "left-4-2";
+export const SLOT_Q = "left-1-1";
+export const SLOT_W = "left-2-1";
+export const SLOT_E = "left-3-1";
+export const SLOT_R = "left-4-1";
+
+export const RETURN_TO_BASE_LAYER = "right-5-3";
+
+export const COLOR_BASIC_ABILITIES = "#15BBF2"; //cyan-blue-ish
+export const COLOR_ULT = "#F50A4E"; //magenta-red-ish
 
 export const SpellEnums = [
   {
