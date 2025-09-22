@@ -8,10 +8,11 @@ Uses:
 
 ## Feature Roadmap
 
-[x] changes summoner spell LED colors depending on the selected summoner spells
-[] highlight item slots with active items
-[] implement skill/summoner spell/item cooldowns
+- [x] change summoner spell LED colors depending on the selected summoner spells
+- [ ] highlight item slots with active items
+- [ ] implement skill/summoner spell/item cooldowns
 
+## Installation and Usage
 
 To install dependencies:
 
