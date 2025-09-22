@@ -146,10 +146,187 @@ async function fetchLCU(
 }
 
 /**
- * Create a small wrapper client with bound credentials.
+ * Event types & payload for LCU WebSocket notifications.
+ * Matches the structure delivered after subscribing with [5,"OnJsonApiEvent"].
+ */
+export type LCUEventType = "Create" | "Update" | "Delete";
+export interface LCUApiEvent<T = any> {
+  uri: string;
+  eventType: LCUEventType;
+  data: T;
+}
+
+/**
+ * Create a wrapper client with bound credentials + WebSocket event support.
+ *
+ * Usage:
+ *   const client = createLCUClient(creds);
+ *   await client.connectEvents(); // establishes websocket & subscribes
+ *   client.on("/lol-champ-select/v1/session", (data, type) => { ... });
+ *   client.on("*", (data, type, raw) => { console.log(raw.uri, type); }); // wildcard
+ *   client.on("connect", () => console.log("Events connected"));
+ *   client.on("disconnect", () => console.log("Events disconnected"));
  */
 export function createLCUClient(creds: LCUCredentials) {
-  return {
+  type EventHandler = (
+    data: any,
+    eventType: LCUEventType,
+    raw: LCUApiEvent<any>,
+  ) => void;
+
+  const listeners = new Map<string, Set<EventHandler>>();
+  // Special pseudo-events: "connect", "disconnect", and wildcard "*"
+  let ws: WebSocket | null = null;
+  let connecting = false;
+  let subscribed = false;
+  let reconnectTimer: Timer | null = null;
+
+  const scheme = creds.protocol === "https" ? "wss" : "ws";
+  const wsUrl = `${scheme}://127.0.0.1:${creds.port}`;
+
+  function addListener(key: string, fn: EventHandler) {
+    if (!listeners.has(key)) listeners.set(key, new Set());
+    listeners.get(key)!.add(fn);
+  }
+
+  function removeListener(key: string, fn: EventHandler) {
+    const set = listeners.get(key);
+    if (!set) return;
+    set.delete(fn);
+    if (set.size === 0) listeners.delete(key);
+  }
+
+  function emit(uri: string, data: any, eventType: LCUEventType) {
+    const raw: LCUApiEvent = { uri, data, eventType };
+    const direct = listeners.get(uri);
+    direct?.forEach((fn) => fn(data, eventType, raw));
+    const wildcard = listeners.get("*");
+    wildcard?.forEach((fn) => fn(data, eventType, raw));
+  }
+
+  function emitPseudo(event: "connect" | "disconnect") {
+    const raw: LCUApiEvent = {
+      uri: event,
+      data: undefined,
+      eventType: "Update",
+    };
+    const direct = listeners.get(event);
+    direct?.forEach((fn) => fn(undefined, "Update", raw));
+    const wildcard = listeners.get("*");
+    wildcard?.forEach((fn) => fn(undefined, "Update", raw));
+  }
+
+  async function connectEvents(autoReconnect = true): Promise<void> {
+    if (ws && ws.readyState === ws.OPEN) return;
+    if (connecting) {
+      // Wait until existing attempt finishes
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (ws && ws.readyState === ws.OPEN) resolve();
+          else if (!connecting) resolve();
+          else setTimeout(check, 50);
+        };
+        check();
+      });
+      return;
+    }
+
+    connecting = true;
+    try {
+      // Use Authorization header instead of embedding credentials in the URL
+      ws = new WebSocket(wsUrl, {
+        headers: {
+          Authorization: buildBasicAuth(creds.password),
+        },
+        // Bun-specific TLS override for the local self-signed cert
+        tls: { rejectUnauthorized: false },
+      } as any);
+
+      await new Promise<void>((resolve, reject) => {
+        if (!ws) return reject(new Error("WebSocket not initialized"));
+        ws.onopen = () => {
+          subscribed = false;
+          ws?.send(JSON.stringify([5, "OnJsonApiEvent"]));
+          subscribed = true;
+          emitPseudo("connect");
+          resolve();
+        };
+        ws.onerror = (ev) => {
+          reject(new Error("LCU WebSocket error"));
+        };
+      });
+
+      if (ws) {
+        ws.onmessage = (msg) => {
+          try {
+            const parsed = JSON.parse(
+              typeof msg.data === "string" ? msg.data : "",
+            );
+            // Expected shape: [<opcode>, <eventName>, { data, eventType, uri }]
+            if (Array.isArray(parsed) && parsed[2] && parsed[2].uri) {
+              const evObj = parsed[2] as LCUApiEvent;
+              emit(evObj.uri, evObj.data, evObj.eventType);
+            }
+          } catch {
+            // Ignore malformed frames
+          }
+        };
+        ws.onclose = () => {
+          emitPseudo("disconnect");
+          subscribed = false;
+          if (autoReconnect) {
+            if (reconnectTimer) clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => {
+              connectEvents(true).catch(() => {
+                // silent; another retry will occur
+              });
+            }, 1000);
+          }
+        };
+        ws.onerror = () => {
+          // Will cause a close; rely on onclose for reconnect
+        };
+      }
+    } finally {
+      connecting = false;
+    }
+  }
+
+  function disconnectEvents() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (ws && ws.readyState === ws.OPEN) ws.close();
+    ws = null;
+  }
+
+  function on(uri: string, handler: EventHandler) {
+    addListener(uri, handler);
+    return api;
+  }
+
+  function off(uri: string, handler: EventHandler) {
+    removeListener(uri, handler);
+    return api;
+  }
+
+  function once(uri: string, handler: EventHandler) {
+    const wrapper: EventHandler = (d, t, r) => {
+      off(uri, wrapper);
+      handler(d, t, r);
+    };
+    on(uri, wrapper);
+    return api;
+  }
+
+  function removeAllListeners(uri?: string) {
+    if (uri) listeners.delete(uri);
+    else listeners.clear();
+    return api;
+  }
+
+  const api = {
     creds,
     /**
      * Raw fetch convenience.
@@ -172,7 +349,49 @@ export function createLCUClient(creds: LCUCredentials) {
       }
       return (await res.json()) as T;
     },
+
+    /**
+     * Establish (or ensure) WebSocket subscription to all JSON API events.
+     */
+    connectEvents,
+
+    /**
+     * Close WebSocket & cancel auto-reconnect.
+     */
+    disconnectEvents,
+
+    /**
+     * Register an event listener.
+     *  - uri: specific endpoint (e.g. "/lol-champ-select/v1/session")
+     *  - "*" : wildcard for all events (includes "connect"/"disconnect")
+     *  - "connect" / "disconnect": pseudo lifecycle events
+     */
+    on,
+
+    /**
+     * Remove a specific listener.
+     */
+    off,
+
+    /**
+     * One-time listener.
+     */
+    once,
+
+    /**
+     * Remove listeners (for a uri or all).
+     */
+    removeAllListeners,
+
+    /**
+     * Whether WebSocket is currently open.
+     */
+    get eventsConnected() {
+      return !!ws && ws.readyState === ws.OPEN;
+    },
   };
+
+  return api;
 }
 
 async function safeText(res: Response): Promise<string> {

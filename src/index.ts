@@ -1,7 +1,52 @@
-import https from "https";
-import { $ } from "bun";
 import { createLCUClient, getLCUCredentials } from "./league/LcuClient";
 
+const SpellEnums = [
+  {
+    name: "Cleanse",
+    spellId: 1,
+    color: "#00FFFF",
+  },
+  {
+    name: "Exhaust",
+    spellId: 3,
+    color: "#d3891b",
+  },
+  {
+    name: "Flash",
+    spellId: 4,
+    color: "#FF00FF",
+  },
+  {
+    name: "Ghost",
+    spellId: 6,
+    color: "#0000FF",
+  },
+  {
+    name: "Heal",
+    spellId: 7,
+    color: "#00FF00",
+  },
+  {
+    name: "Smite",
+    spellId: 11,
+    color: "#f7bb25",
+  },
+  {
+    name: "Teleport",
+    spellId: 12,
+    color: "#6119a0",
+  },
+  {
+    name: "Ignite",
+    spellId: 14,
+    color: "#FF0000",
+  },
+  {
+    name: "Barrier",
+    spellId: 21,
+    color: "#f2c31a",
+  },
+];
 const main = async () => {
   const creds = await getLCUCredentials({ timeoutMs: 5000 });
   if (!creds) {
@@ -11,12 +56,45 @@ const main = async () => {
     return;
   }
 
-  console.log(creds);
-
   const client = createLCUClient(creds);
 
-  const res = await client.json("/lol-champ-select/v1/session/my-selection");
-  console.log(res);
+  // --- LCU Event Stream ------------------------------------------------------
+  await client.connectEvents();
+  client.on("connect", () => console.log("[events] connected"));
+  client.on("disconnect", () => console.log("[events] disconnected"));
+
+  let init = false;
+  let inProgress = false;
+  client.on("/lol-gameflow/v1/session", async (data, type, raw) => {
+    if (!inProgress && data.phase === "InProgress") {
+      inProgress = true;
+      console.log("[gameflow] Game started");
+      return;
+    }
+
+    if (inProgress && data.phase !== "InProgress") {
+      inProgress = false;
+      console.log("[gameflow] Game ended");
+      return;
+    }
+  });
+
+  // Listen specifically to champion select session updates
+  client.on("/lol-champ-select/v1/session", async (data, type, raw) => {
+    if (!data.gameId) {
+      init = false;
+      return;
+    }
+    if (!init && data) {
+      console.log("[champ-select] session initialized");
+      init = true;
+    }
+    const res: any = await client.json(
+      "/lol-champ-select/v1/session/my-selection",
+    );
+    console.log(`[my-selection] Spell 1: ${res.spell1Id}`);
+  });
+  // ---------------------------------------------------------------------------
 };
 await main();
 // const insecureAgent = new https.Agent({
