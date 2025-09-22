@@ -11,13 +11,17 @@ Options:
   -h, --help               Print help
 */
 import { $ } from "bun";
+import { validateSetRgbOptions, parseEasyName } from "./types";
 import type { EasyName, SetRgbOptions } from "./types";
 
-export const setRgb = async ({ led, color }: SetRgbOptions) => {
-  if (typeof led == "number")
+export const setRgb = async (input: SetRgbOptions) => {
+  // Runtime validation; will throw if invalid
+  const { led, color } = validateSetRgbOptions(input);
+  if (typeof led === "number") {
     return await $`kontroll set-rgb --led ${led} --color ${color}`.text();
-
-  return await $`kontroll set-rgb --led ${translateNameToNum(led)} --color ${color}`.text();
+  }
+  const index = translateNameToNum(led);
+  return await $`kontroll set-rgb --led ${index} --color ${color}`.text();
 };
 
 /**
@@ -39,48 +43,21 @@ export const setRgb = async ({ led, color }: SetRgbOptions) => {
  */
 
 const translateNameToNum = (name: EasyName): number => {
-  const parts = name.split("-");
+  // Use Zod-based parsing to validate and extract components
+  const { board, x, y } = parseEasyName(name);
 
-  // Validate board
-  if (parts[0] !== "left" && parts[0] !== "right") {
-    throw new Error(`Invalid board: ${parts[0]}`);
-  }
-  const board = parts[0] as "left" | "right";
-
-  // Validate x
-  let x: "thumb" | number;
-  if (parts[1] === "thumb") {
-    x = "thumb";
-  } else {
-    const xNum = parseInt(parts[1]);
-    if (isNaN(xNum) || xNum < 0 || xNum > 5) {
-      throw new Error(`Invalid x: ${parts[1]}`);
-    }
-    x = xNum;
-  }
-
-  // Validate y
-  const y = parseInt(parts[2]);
-  if (isNaN(y) || y < 0 || y > 3) {
-    throw new Error(`Invalid y: ${parts[2]}`);
-  }
-
-  // Calculate key number
   if (x === "thumb") {
-    // Thumb keys
     if (board === "left") {
-      // left board: inner thumb is 24, outer thumb is 25
       return y === 0 ? 24 : 25;
     } else {
-      // right board: inner thumb is 50, outer thumb is 51
       return y === 0 ? 50 : 51;
     }
+  }
+
+  // Regular grid keys
+  if (board === "left") {
+    return x + y * 6;
   } else {
-    // Regular grid keys
-    if (board === "left") {
-      return x + y * 6;
-    } else {
-      return 26 + x + y * 6;
-    }
+    return 26 + x + y * 6;
   }
 };
