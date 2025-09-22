@@ -1,4 +1,5 @@
 import { restoreRgbLeds } from "./restoreRgbLeds";
+import { setLayer } from "./setLayer";
 import { setRgb, setRgbAll } from "./setRgb";
 
 /**
@@ -33,4 +34,5 @@ export default {
   setRgb,
   setRgbAll,
   restoreRgbLeds,
+  setLayer,
 };
