@@ -1,52 +1,59 @@
+import {
+  LEAGUE_LAYER,
+  SPELL_1_SLOT,
+  SPELL_2_SLOT,
+  SpellEnums,
+} from "./CONSTANTS";
+import kontroll from "./kontroll";
 import { createLCUClient, getLCUCredentials } from "./league/LcuClient";
 
-const SpellEnums = [
-  {
-    name: "Cleanse",
-    spellId: 1,
-    color: "#00FFFF",
-  },
-  {
-    name: "Exhaust",
-    spellId: 3,
-    color: "#d3891b",
-  },
-  {
-    name: "Flash",
-    spellId: 4,
-    color: "#FF00FF",
-  },
-  {
-    name: "Ghost",
-    spellId: 6,
-    color: "#0000FF",
-  },
-  {
-    name: "Heal",
-    spellId: 7,
-    color: "#00FF00",
-  },
-  {
-    name: "Smite",
-    spellId: 11,
-    color: "#f7bb25",
-  },
-  {
-    name: "Teleport",
-    spellId: 12,
-    color: "#6119a0",
-  },
-  {
-    name: "Ignite",
-    spellId: 14,
-    color: "#FF0000",
-  },
-  {
-    name: "Barrier",
-    spellId: 21,
-    color: "#f2c31a",
-  },
-];
+const resolveSpellColor = (id: number) =>
+  SpellEnums.find((el) => el.spellId === id)?.color ?? "#FFFFFF";
+
+const initLeagueMode = async ({
+  spell1Id,
+  spell2Id,
+}: {
+  spell1Id: number;
+  spell2Id: number;
+}) => {
+  kontroll.setLayer(LEAGUE_LAYER);
+  // --- Set up Defaults -------------------------------------------------------
+  const qwe = ["left-1-1", "left-2-1", "left-3-1"];
+  const r = "left-4-1";
+  const RETURN_TO_BASE_LAYER = "right-5-3";
+
+  qwe.forEach((led) =>
+    kontroll.setRgb({
+      led: led,
+      color: "#15BBF2", //cyan-blue-ish
+    }),
+  );
+
+  [r, RETURN_TO_BASE_LAYER].forEach((led) => {
+    kontroll.setRgb({
+      led: led,
+      color: "#F50A4E", //magenta-red-ish
+    });
+  });
+  // ---------------------------------------------------------------------------
+  // Set up spells
+  kontroll.setRgb({
+    led: SPELL_1_SLOT,
+    color: resolveSpellColor(spell1Id),
+  });
+
+  kontroll.setRgb({
+    led: SPELL_2_SLOT,
+    color: resolveSpellColor(spell2Id),
+  });
+};
+
+const endLeagueMode = async () => {
+  kontroll.restoreRgbLeds();
+  kontroll.setLayer(0);
+};
+
 const main = async () => {
   const creds = await getLCUCredentials({ timeoutMs: 5000 });
   if (!creds) {
@@ -60,21 +67,26 @@ const main = async () => {
 
   // --- LCU Event Stream ------------------------------------------------------
   await client.connectEvents();
-  client.on("connect", () => console.log("[events] connected"));
-  client.on("disconnect", () => console.log("[events] disconnected"));
 
-  let init = false;
-  let inProgress = false;
+  let champSelectInit = false;
+  let gameInProgress = false;
+  let spell1Id = 0;
+  let spell2Id = 0;
   client.on("/lol-gameflow/v1/session", async (data, type, raw) => {
-    if (!inProgress && data.phase === "InProgress") {
-      inProgress = true;
+    if (!gameInProgress && data.phase === "InProgress") {
+      gameInProgress = true;
       console.log("[gameflow] Game started");
+      initLeagueMode({
+        spell1Id,
+        spell2Id,
+      });
       return;
     }
 
-    if (inProgress && data.phase !== "InProgress") {
-      inProgress = false;
+    if (gameInProgress && data.phase !== "InProgress") {
+      gameInProgress = false;
       console.log("[gameflow] Game ended");
+      endLeagueMode();
       return;
     }
   });
@@ -82,17 +94,19 @@ const main = async () => {
   // Listen specifically to champion select session updates
   client.on("/lol-champ-select/v1/session", async (data, type, raw) => {
     if (!data.gameId) {
-      init = false;
+      champSelectInit = false;
       return;
     }
-    if (!init && data) {
+    if (!champSelectInit && data) {
       console.log("[champ-select] session initialized");
-      init = true;
+      champSelectInit = true;
     }
     const res: any = await client.json(
       "/lol-champ-select/v1/session/my-selection",
     );
-    console.log(`[my-selection] Spell 1: ${res.spell1Id}`);
+    spell1Id = res.spell1Id;
+    spell2Id = res.spell2Id;
+    console.log(`spell1Id: ${spell1Id}, spell2Id: ${spell2Id}`);
   });
   // ---------------------------------------------------------------------------
 };
