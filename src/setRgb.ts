@@ -11,7 +11,7 @@ Options:
   -h, --help               Print help
 */
 import { $ } from "bun";
-import { validateSetRgbOptions, parseEasyName } from "./types";
+import { validateSetRgbOptions, parseEasyName, isEasyName } from "./types";
 import type { EasyName, SetRgbOptions } from "./types";
 
 export const setRgb = async (input: SetRgbOptions) => {
@@ -20,8 +20,11 @@ export const setRgb = async (input: SetRgbOptions) => {
   if (typeof led === "number") {
     return await $`kontroll set-rgb --led ${led} --color ${color}`.text();
   }
-  const index = translateNameToNum(led);
-  return await $`kontroll set-rgb --led ${index} --color ${color}`.text();
+  if (isEasyName(led)) {
+    const index = translateNameToNum(led as EasyName);
+    return await $`kontroll set-rgb --led ${index} --color ${color}`.text();
+  }
+  throw new Error("Invalid LED identifier");
 };
 
 /**
