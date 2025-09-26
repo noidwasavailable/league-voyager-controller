@@ -13,11 +13,23 @@ import {
 } from "./CONSTANTS";
 import kontroll from "./kontroll";
 import { createLCUClient, getLCUCredentials } from "./league/LcuClient";
+import { $, sleepSync } from "bun";
+
+const getForegroundAppTitle = async (): Promise<string> => {
+  try {
+    const res =
+      await $`osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true'`.text();
+    return res.trim();
+  } catch (error) {
+    console.error("Error getting foreground app:", error);
+    return "";
+  }
+};
 
 const resolveSpellColor = (id: number) =>
   SpellEnums.find((el) => el.spellId === id)?.color ?? "#FFFFFF";
 
-const initLeagueMode = async ({
+const setLeagueLayer = async ({
   spell1Id,
   spell2Id,
 }: {
@@ -53,7 +65,7 @@ const initLeagueMode = async ({
   });
 };
 
-const endLeagueMode = async () => {
+const unsetLeagueLayer = async () => {
   kontroll.restoreRgbLeds();
   kontroll.setLayer(0);
 };
@@ -76,21 +88,71 @@ const main = async () => {
   let gameInProgress = false;
   let spell1Id = 0;
   let spell2Id = 0;
+
+  const leagueVoyagerController = () => {
+    let intervalId: NodeJS.Timeout | null = null;
+    const fn = async ({
+      spell1Id,
+      spell2Id,
+    }: {
+      spell1Id: number;
+      spell2Id: number;
+    }) => {
+      const currentActiveApp = await getForegroundAppTitle();
+      const currentLayer = await kontroll.getLayer();
+      const isCurrentActiveAppLeague =
+        currentActiveApp.includes("LeagueofLegends");
+      if (currentLayer == LEAGUE_LAYER) {
+        if (isCurrentActiveAppLeague) return;
+
+        unsetLeagueLayer();
+        return;
+      }
+
+      if (isCurrentActiveAppLeague) {
+        setLeagueLayer({ spell1Id, spell2Id });
+        return;
+      }
+    };
+
+    const init = ({
+      spell1Id,
+      spell2Id,
+    }: {
+      spell1Id: number;
+      spell2Id: number;
+    }) => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fn, 1000, { spell1Id, spell2Id });
+    };
+
+    const cleanup = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = null;
+      unsetLeagueLayer();
+      setTimeout(unsetLeagueLayer, 3000); //to prevent race condition
+    };
+
+    return {
+      init,
+      cleanup,
+    };
+  };
+
+  const controller = leagueVoyagerController();
+
   client.on("/lol-gameflow/v1/session", async (data, type, raw) => {
     if (!gameInProgress && data.phase === "InProgress") {
       gameInProgress = true;
       console.log("[gameflow] Game started");
-      initLeagueMode({
-        spell1Id,
-        spell2Id,
-      });
+      controller.init({ spell1Id, spell2Id });
       return;
     }
 
     if (gameInProgress && data.phase !== "InProgress") {
       gameInProgress = false;
       console.log("[gameflow] Game ended");
-      endLeagueMode();
+      controller.cleanup();
       return;
     }
   });
